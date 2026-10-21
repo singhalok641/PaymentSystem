@@ -42,11 +42,11 @@ The repository currently contains:
 
 - A Spring Boot application starter and an application-context test.
 - Maven configuration targeting Java 25 and Spring Boot 4.1.1.
-- Spring MVC, the MySQL JDBC driver, Lombok, and development tools.
+- Spring MVC, JDBC, Flyway with MySQL support, Lombok, and development tools.
 - MySQL connection settings in `src/main/resources/application.yml`.
 - An initial schema in `src/main/resources/db/migration/V1__create_payment_tables.sql`.
 
-**There are no payment endpoints or PSP calls yet.** The build does not yet include JPA/JDBC persistence starters or Flyway. The schema file is therefore not automatically applied, and the JPA configuration does not yet establish a working persistence layer.
+**There are no payment endpoints or PSP calls yet.** Flyway applies the initial schema on application startup through the configured JDBC datasource. JPA is not used; Flyway owns schema creation and migration.
 
 ## Our first lesson: persist the intent
 
@@ -87,7 +87,7 @@ We start with one Spring Boot application and one MySQL database. Payment orches
 
 - JDK 25, matching the project's Maven configuration.
 - Internet access for Maven dependency downloads.
-- MySQL when working on the persistence lesson; it is not yet wired into the starter's application logic.
+- A running MySQL instance with the database and credentials configured below (also required for the application-context test).
 
 A Maven installation is optional because the repository includes the Maven Wrapper.
 
@@ -100,7 +100,7 @@ java -version
 
 Both should use JDK 25. If they differ, check `JAVA_HOME` and your IDE's project and Maven JDK settings.
 
-Run the current tests and start the application:
+Complete the database setup below, then run the current tests and start the application:
 
 ```bash
 ./mvnw test
@@ -109,9 +109,9 @@ Run the current tests and start the application:
 
 On Windows, use `mvnw.cmd` instead of `./mvnw`.
 
-The default web port is `8080`. No home page or business endpoint exists yet, so a `404` at `http://localhost:8080/` is expected. Starting the web application alone does not verify a database connection or a payment flow.
+The default web port is `8080`. No home page or business endpoint exists yet, so a `404` at `http://localhost:8080/` is expected. Successful application startup now requires a database connection and successful Flyway migration. It does not verify a payment flow.
 
-### Database configuration for the next step
+### Database configuration
 
 The configuration points to a local database named `payment_system`:
 
@@ -119,9 +119,27 @@ The configuration points to a local database named `payment_system`:
 jdbc:mysql://localhost:3306/payment_system
 ```
 
-It reads credentials from `DB_USERNAME` and `DB_PASSWORD`. Set these in your local environment or IDE run configuration when we wire up persistence. Do not commit actual credentials.
+The username defaults to `payment_app` and can be overridden with `DB_USERNAME`. Set `DB_PASSWORD` in your shell or IDE run configuration. Do not commit actual credentials.
 
-We will add the persistence and migration dependencies, create the local database, and verify schema migration during the first implementation lesson. Do not assume the SQL file runs merely because it is in a `db/migration` directory.
+Before starting, create the `payment_system` database and a MySQL account with access to it if they do not already exist. For a new local setup, run the following as a MySQL administrator, replacing the password placeholder:
+
+```sql
+CREATE DATABASE IF NOT EXISTS payment_system;
+CREATE USER 'payment_app'@'localhost' IDENTIFIED BY 'replace-with-your-local-password';
+GRANT ALL PRIVILEGES ON payment_system.* TO 'payment_app'@'localhost';
+```
+
+Set `DB_PASSWORD` to that account's password. Reload the Maven project in your IDE after dependency changes, then restart the application.
+
+Flyway automatically discovers `db/migration/V1__create_payment_tables.sql`, applies it once, and records it in `flyway_schema_history`. Subsequent starts only apply new migrations. Verify the result in MySQL:
+
+```sql
+USE payment_system;
+SHOW TABLES;
+SELECT version, description, success FROM flyway_schema_history;
+```
+
+Expect `payment_checkouts`, `payment_orders`, and `flyway_schema_history`, with migration version `1` successful. Once applied, keep V1 unchanged and add a new versioned migration for future schema changes.
 
 ## Repository guide
 
