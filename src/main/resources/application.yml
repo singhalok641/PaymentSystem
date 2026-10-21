@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: PaymentSystem
+  datasource:
+    url: jdbc:mysql://localhost:3306/payment_system
+    username: payment_app
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
